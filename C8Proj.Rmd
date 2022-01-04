@@ -1,0 +1,136 @@
+---
+title: "Course 8 Final Project"
+author: "Snehangshu Roy"
+date: "05/01/2022"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## Introduction
+
+This is the report for the final project of the Practical Machine Learning course at John Hopkins University. This document was created using RStudio, and all the codes are based on R version 4.0.3. In this project, we show the process of training a machine learning algorithm that predict people’s exercise habit using personal activity data collected by smart wearable products such as Apple Watch. This report contains the following sections:
+
+1. Data Preparation
+2. Model Building & Exploratory Data Analysis
+3. Model Evaluation
+4. Conclusion
+
+The above sections are intentionally presented in a way that reflects the data science pipeline suggested by the Cross-industry Standard Process for Data Mining (CRISP_DM) (Shearer 2000).
+
+## Data Preparation
+
+We load the data set from the source given. The train data is the main csv file and the validation data is the pml-testing.csv. 
+To make model of the data diven we grab only the numeric columns. As some data have bigger absolute value so we take scale of the data to standardize it. 
+
+
+```{r cache=TRUE}
+# Loading the dataset
+trainData_original = read.csv("pml-training.csv")
+validData_original = read.csv("pml-testing.csv")
+
+# loading the libraries
+# Libraries
+library(dplyr)
+library(caret)
+library(gbm)
+library(randomForest)
+library(rpart)
+library(rattle)
+# only grabbng the numeric columns
+
+numcoltrain = sapply(trainData_original, is.numeric)
+numcoltest = sapply(validData_original, is.numeric)
+
+traindata = trainData_original[, numcoltrain ]
+validData = validData_original[,numcoltest]
+
+
+
+#we need to predict on the the test data
+# so only takes the columns from trainselt which are in common with test set
+colset = colnames(validData)
+
+
+traindata = traindata %>% select(colset[-57])
+
+# scale training data
+traindata = scale(traindata)
+traindata = as.data.frame(traindata)
+#adding the predictor variable
+traindata$classe = trainData_original$classe
+
+traindata$classe = factor(traindata$classe)
+```
+
+##  Model Building & Exploratory Data Analysis
+
+After the data preparation model building will be carried out. We have considered the model of Decision Tree and Random Forest. The initial train data will be devided to train and test the models. To improve the caret package speed the cross-validation technique will be used. 
+
+```{r cache=TRUE}
+set.seed(123)
+intrain = createDataPartition(y=traindata$classe, p=.6, list = F )
+
+traindata = traindata[intrain,]
+testdata = traindata[-intrain,]
+
+fitControl = trainControl(method='cv', number = 3)
+
+#testing Decision Tree Model
+
+modelDT = train(classe~., traindata, method = "rpart", trControl=fitControl)
+# piloting the Decision Tree Model
+fancyRpartPlot(modelDT$finalModel)
+
+
+
+```
+
+
+In next step the accurary of the model will be tested. 
+
+```{r cache=TRUE}
+pred_classDT = predict(modelDT, testdata)
+
+
+confusionMatrix(pred_classDT, testdata$classe)$overall[1]
+```
+It was found that the model accuracy is only 66 %. It can be improved using the RandomForest Method. 
+
+```{r cache=TRUE}
+# testing Random Forest model
+
+modelRF = train(classe ~ ., data= traindata, method = "rf", ntree=100, 
+                trControl = fitControl)
+
+pred_classRF = predict(modelRF, testdata)
+
+
+confusionMatrix(pred_classRF, testdata$classe)$overall[1]
+```
+
+The new model able to able to check with higher accuracy. 
+Checking the model with some plots
+
+```{r}
+plot(modelRF$finalModel, main = "Model Error with number of Trees")
+```
+
+Checking effect of the predictos
+
+```{r}
+plot(modelRF, main = "model accuracy with number of predicors")
+```
+Checking the model with the validation dat
+
+```{r}
+newdata = scale(validData)
+newdata= as.data.frame(newdata)
+
+pred_validation = predict(modelRF, newdata = newdata[-57])
+pred_validation
+```
+
+
